@@ -1,339 +1,573 @@
-<script>
-    // 菜单数据
-    const dineInMenu = [
-        "猪蹄牛蛙",
-        "米宝贝炒菜", 
-        "牛蛙煲鸡公煲",
-        "牛肉粉",
-        "烤鸭店", 
-        "串串"
-    ];
-    
-    const deliveryMenu = [
-        "胡子大厨",
-        "酸菜鱼",
-        "汉堡",
-        "蛙来哒牛蛙"
-    ];
-
-    // 获取DOM元素
-    const resultEl = document.getElementById('result');
-    const menuEl = document.getElementById('menu');
-    const menuListEl = document.getElementById('menuList');
-    const statusEl = document.getElementById('status');
-    const recommendBtn = document.getElementById('recommendBtn');
-    const menuBtn = document.getElementById('menuBtn');
-    const dineInBtn = document.getElementById('dineInBtn');
-    const deliveryBtn = document.getElementById('deliveryBtn');
-
-    // 全局变量
-    let currentMode = null; // 'dineIn' 或 'delivery'
-    let currentMenu = [];
-    let weeklyHistory = {
-        dineIn: [],
-        delivery: []
-    };
-    
-    // 存储每日推荐结果
-    let dailyRecommendations = {
-        dineIn: {},
-        delivery: {}
-    };
-
-    // 初始化菜单列表
-    function initMenu() {
-        menuListEl.innerHTML = currentMenu.map(item => 
-            `<li class="menu-item">${item}</li>`
-        ).join('');
-    }
-
-    // 选择堂食或外卖模式
-    function selectMode(mode) {
-        currentMode = mode;
-        
-        // 更新按钮状态
-        dineInBtn.classList.remove('active');
-        deliveryBtn.classList.remove('active');
-        
-        if (mode === 'dineIn') {
-            dineInBtn.classList.add('active');
-            currentMenu = dineInMenu;
-            statusEl.textContent = '已选择堂食模式';
-        } else {
-            deliveryBtn.classList.add('active', 'secondary');
-            currentMenu = deliveryMenu;
-            statusEl.textContent = '已选择外卖模式';
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>午餐推荐器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
         
-        // 启用功能按钮
-        recommendBtn.disabled = false;
-        menuBtn.disabled = false;
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+            padding: 20px;
+        }
         
-        // 重置结果显示
-        resultEl.innerHTML = '<div>点击"随机推荐"按钮开始</div>';
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
         
-        // 隐藏菜单
-        menuEl.style.display = 'none';
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #4A5568;
+            font-size: 2rem;
+        }
         
-        // 加载历史记录
-        loadWeeklyHistory();
+        .mode-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
         
-        // 检查是否有今日的缓存推荐
-        checkDailyRecommendation();
-    }
+        .mode-btn {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #E2E8F0;
+            color: #4A5568;
+        }
+        
+        .mode-btn.active {
+            background: #4ECDC4;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(78, 205, 196, 0.4);
+        }
+        
+        .mode-btn.secondary.active {
+            background: #FF6B6B;
+            box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
+        }
+        
+        .result-container {
+            background: #F7FAFC;
+            border-radius: 15px;
+            padding: 30px;
+            margin: 20px 0;
+            text-align: center;
+            min-height: 200px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border: 2px dashed #CBD5E0;
+        }
+        
+        .recommendation-text {
+            font-size: 1.2rem;
+            color: #718096;
+            margin-bottom: 10px;
+        }
+        
+        .food-name {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #2D3748;
+            margin: 10px 0;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        
+        .action-btn {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #4ECDC4;
+            color: white;
+        }
+        
+        .action-btn:disabled {
+            background: #CBD5E0;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .action-btn:not(:disabled):hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .menu-btn {
+            background: #FFD166;
+        }
+        
+        .status-bar {
+            text-align: center;
+            margin-top: 20px;
+            padding: 10px;
+            background: #EDF2F7;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            color: #4A5568;
+            transition: color 0.3s ease;
+        }
+        
+        .menu-container {
+            margin-top: 20px;
+            background: #F7FAFC;
+            border-radius: 15px;
+            padding: 20px;
+            display: none;
+        }
+        
+        .menu-title {
+            text-align: center;
+            margin-bottom: 15px;
+            color: #4A5568;
+            font-weight: 600;
+        }
+        
+        .menu-list {
+            list-style: none;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        
+        .menu-item {
+            background: white;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s ease;
+        }
+        
+        .menu-item:hover {
+            transform: translateY(-2px);
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #ffffff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .shortcut-hint {
+            text-align: center;
+            margin-top: 15px;
+            font-size: 0.8rem;
+            color: #718096;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🍽️ 午餐推荐器</h1>
+        
+        <div class="mode-selector">
+            <button id="dineInBtn" class="mode-btn">堂食</button>
+            <button id="deliveryBtn" class="mode-btn secondary">外卖</button>
+        </div>
+        
+        <div class="result-container" id="result">
+            <div>请先选择堂食或外卖模式</div>
+        </div>
+        
+        <div class="button-group">
+            <button id="recommendBtn" class="action-btn" disabled>🎲 随机推荐</button>
+            <button id="menuBtn" class="action-btn menu-btn" disabled>📋 查看菜单</button>
+        </div>
+        
+        <div class="menu-container" id="menu">
+            <div class="menu-title">菜单列表</div>
+            <ul class="menu-list" id="menuList">
+                <!-- 菜单项将通过JavaScript动态生成 -->
+            </ul>
+        </div>
+        
+        <div class="status-bar" id="status">
+            请选择堂食或外卖模式
+        </div>
+        
+        <div class="shortcut-hint">
+            快捷键: 空格键(推荐) | M键(菜单) | D键(堂食) | W键(外卖)
+        </div>
+    </div>
 
-    // 检查今日的缓存推荐
-    function checkDailyRecommendation() {
-        const today = new Date().toDateString();
-        const storedDaily = localStorage.getItem('dailyFoodRecommendations');
+    <script>
+        // 您的JavaScript代码放在这里（您之前提供的那段代码）
+        // 菜单数据
+        const dineInMenu = [
+            "猪蹄牛蛙",
+            "米宝贝炒菜", 
+            "牛蛙煲鸡公煲",
+            "牛肉粉",
+            "烤鸭店", 
+            "串串"
+        ];
         
-        if (storedDaily) {
-            dailyRecommendations = JSON.parse(storedDaily);
+        const deliveryMenu = [
+            "胡子大厨",
+            "酸菜鱼",
+            "汉堡",
+            "蛙来哒牛蛙"
+        ];
+
+        // 获取DOM元素
+        const resultEl = document.getElementById('result');
+        const menuEl = document.getElementById('menu');
+        const menuListEl = document.getElementById('menuList');
+        const statusEl = document.getElementById('status');
+        const recommendBtn = document.getElementById('recommendBtn');
+        const menuBtn = document.getElementById('menuBtn');
+        const dineInBtn = document.getElementById('dineInBtn');
+        const deliveryBtn = document.getElementById('deliveryBtn');
+
+        // 全局变量
+        let currentMode = null; // 'dineIn' 或 'delivery'
+        let currentMenu = [];
+        let weeklyHistory = {
+            dineIn: [],
+            delivery: []
+        };
+        
+        // 存储每日推荐结果
+        let dailyRecommendations = {
+            dineIn: {},
+            delivery: {}
+        };
+
+        // 初始化菜单列表
+        function initMenu() {
+            menuListEl.innerHTML = currentMenu.map(item => 
+                `<li class="menu-item">${item}</li>`
+            ).join('');
+        }
+
+        // 选择堂食或外卖模式
+        function selectMode(mode) {
+            currentMode = mode;
             
-            // 检查是否是今天的记录
-            const lastUpdate = localStorage.getItem('dailyFoodLastUpdate');
-            if (lastUpdate === today && dailyRecommendations[currentMode][today]) {
-                const cachedRecommendation = dailyRecommendations[currentMode][today];
-                showCachedRecommendation(cachedRecommendation);
+            // 更新按钮状态
+            dineInBtn.classList.remove('active');
+            deliveryBtn.classList.remove('active');
+            
+            if (mode === 'dineIn') {
+                dineInBtn.classList.add('active');
+                currentMenu = dineInMenu;
+                statusEl.textContent = '已选择堂食模式';
+            } else {
+                deliveryBtn.classList.add('active', 'secondary');
+                currentMenu = deliveryMenu;
+                statusEl.textContent = '已选择外卖模式';
+            }
+            
+            // 启用功能按钮
+            recommendBtn.disabled = false;
+            menuBtn.disabled = false;
+            
+            // 重置结果显示
+            resultEl.innerHTML = '<div>点击"随机推荐"按钮开始</div>';
+            
+            // 隐藏菜单
+            menuEl.style.display = 'none';
+            
+            // 加载历史记录
+            loadWeeklyHistory();
+            
+            // 检查是否有今日的缓存推荐
+            checkDailyRecommendation();
+        }
+
+        // 检查今日的缓存推荐
+        function checkDailyRecommendation() {
+            const today = new Date().toDateString();
+            const storedDaily = localStorage.getItem('dailyFoodRecommendations');
+            
+            if (storedDaily) {
+                dailyRecommendations = JSON.parse(storedDaily);
+                
+                // 检查是否是今天的记录
+                const lastUpdate = localStorage.getItem('dailyFoodLastUpdate');
+                if (lastUpdate === today && dailyRecommendations[currentMode][today]) {
+                    const cachedRecommendation = dailyRecommendations[currentMode][today];
+                    showCachedRecommendation(cachedRecommendation);
+                }
             }
         }
-    }
 
-    // 显示缓存的推荐结果
-    function showCachedRecommendation(recommendation) {
-        const today = new Date();
-        const dayOfWeek = today.getDay();
-        
-        resultEl.innerHTML = `
-            <div class="recommendation-text">🎉 今日已推荐</div>
-            <div class="food-name">${recommendation}</div>
-            <div style="margin-top: 10px; font-size: 0.9rem; opacity: 0.8;">
-                ${today.toLocaleDateString('zh-CN')} 周${['日','一','二','三','四','五','六'][dayOfWeek]}
-            </div>
-            <div style="margin-top: 5px; font-size: 0.8rem; opacity: 0.7;">
-                (今日推荐已固定)
-            </div>
-        `;
-        
-        statusEl.textContent = `今日推荐已确定: ${recommendation}`;
-        statusEl.style.color = '#4ECDC4';
-    }
+        // 显示缓存的推荐结果
+        function showCachedRecommendation(recommendation) {
+            const today = new Date();
+            const dayOfWeek = today.getDay();
+            
+            resultEl.innerHTML = `
+                <div class="recommendation-text">🎉 今日已推荐</div>
+                <div class="food-name">${recommendation}</div>
+                <div style="margin-top: 10px; font-size: 0.9rem; opacity: 0.8;">
+                    ${today.toLocaleDateString('zh-CN')} 周${['日','一','二','三','四','五','六'][dayOfWeek]}
+                </div>
+                <div style="margin-top: 5px; font-size: 0.8rem; opacity: 0.7;">
+                    (今日推荐已固定)
+                </div>
+            `;
+            
+            statusEl.textContent = `今日推荐已确定: ${recommendation}`;
+            statusEl.style.color = '#4ECDC4';
+        }
 
-    // 加载周历史记录
-    function loadWeeklyHistory() {
-        const storedHistory = localStorage.getItem('weeklyFoodHistory');
-        if (storedHistory) {
-            weeklyHistory = JSON.parse(storedHistory);
-            
-            // 检查是否是本周的记录
-            const lastUpdate = localStorage.getItem('weeklyFoodLastUpdate');
-            const currentWeek = getWeekNumber(new Date());
-            
-            if (lastUpdate && parseInt(lastUpdate) === currentWeek) {
-                statusEl.textContent += ` | 本周已推荐 ${weeklyHistory[currentMode].length} 次`;
+        // 加载周历史记录
+        function loadWeeklyHistory() {
+            const storedHistory = localStorage.getItem('weeklyFoodHistory');
+            if (storedHistory) {
+                weeklyHistory = JSON.parse(storedHistory);
+                
+                // 检查是否是本周的记录
+                const lastUpdate = localStorage.getItem('weeklyFoodLastUpdate');
+                const currentWeek = getWeekNumber(new Date());
+                
+                if (lastUpdate && parseInt(lastUpdate) === currentWeek) {
+                    statusEl.textContent += ` | 本周已推荐 ${weeklyHistory[currentMode].length} 次`;
+                } else {
+                    // 新的一周，重置历史
+                    weeklyHistory = { dineIn: [], delivery: [] };
+                    saveWeeklyHistory();
+                    statusEl.textContent += ' | 新的一周开始';
+                }
             } else {
-                // 新的一周，重置历史
                 weeklyHistory = { dineIn: [], delivery: [] };
                 saveWeeklyHistory();
-                statusEl.textContent += ' | 新的一周开始';
             }
-        } else {
-            weeklyHistory = { dineIn: [], delivery: [] };
-            saveWeeklyHistory();
         }
-    }
 
-    // 保存周历史记录
-    function saveWeeklyHistory() {
-        localStorage.setItem('weeklyFoodHistory', JSON.stringify(weeklyHistory));
-        localStorage.setItem('weeklyFoodLastUpdate', getWeekNumber(new Date()).toString());
-    }
-
-    // 保存每日推荐
-    function saveDailyRecommendation(recommendation) {
-        const today = new Date().toDateString();
-        
-        if (!dailyRecommendations[currentMode]) {
-            dailyRecommendations[currentMode] = {};
+        // 保存周历史记录
+        function saveWeeklyHistory() {
+            localStorage.setItem('weeklyFoodHistory', JSON.stringify(weeklyHistory));
+            localStorage.setItem('weeklyFoodLastUpdate', getWeekNumber(new Date()).toString());
         }
-        
-        dailyRecommendations[currentMode][today] = recommendation;
-        
-        localStorage.setItem('dailyFoodRecommendations', JSON.stringify(dailyRecommendations));
-        localStorage.setItem('dailyFoodLastUpdate', today);
-    }
 
-    // 获取一年中的第几周
-    function getWeekNumber(date) {
-        const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
-        const pastDaysOfYear = (date - firstDayOfYear) / 86400000;
-        return Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
-    }
-
-    // 基于日期的固定随机种子生成器
-    function createDailySeededRandom() {
-        const today = new Date();
-        const seedString = today.toDateString() + currentMode;
-        let seed = 0;
-        for (let i = 0; i < seedString.length; i++) {
-            seed = ((seed << 5) - seed) + seedString.charCodeAt(i);
-        }
-        seed = Math.abs(seed);
-        
-        return function() {
-            seed = (seed * 9301 + 49297) % 233280;
-            return seed / 233280;
-        };
-    }
-
-    // 随机推荐函数
-    function getRecommendation() {
-        try {
+        // 保存每日推荐
+        function saveDailyRecommendation(recommendation) {
             const today = new Date().toDateString();
             
-            // 检查是否已经有今日推荐
-            if (dailyRecommendations[currentMode] && dailyRecommendations[currentMode][today]) {
-                const cachedRecommendation = dailyRecommendations[currentMode][today];
-                showCachedRecommendation(cachedRecommendation);
-                return;
+            if (!dailyRecommendations[currentMode]) {
+                dailyRecommendations[currentMode] = {};
             }
             
-            const originalText = recommendBtn.innerHTML;
+            dailyRecommendations[currentMode][today] = recommendation;
             
-            // 显示加载状态
-            recommendBtn.innerHTML = '<div class="loading"></div> 推荐中...';
-            recommendBtn.disabled = true;
+            localStorage.setItem('dailyFoodRecommendations', JSON.stringify(dailyRecommendations));
+            localStorage.setItem('dailyFoodLastUpdate', today);
+        }
+
+        // 获取一年中的第几周
+        function getWeekNumber(date) {
+            const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
+            const pastDaysOfYear = (date - firstDayOfYear) / 86400000;
+            return Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+        }
+
+        // 基于日期的固定随机种子生成器
+        function createDailySeededRandom() {
+            const today = new Date();
+            const seedString = today.toDateString() + currentMode;
+            let seed = 0;
+            for (let i = 0; i < seedString.length; i++) {
+                seed = ((seed << 5) - seed) + seedString.charCodeAt(i);
+            }
+            seed = Math.abs(seed);
             
-            statusEl.textContent = '正在计算今日推荐...';
-            
-            // 模拟加载效果
-            setTimeout(() => {
-                // 获取当前周几 (0-6, 0是周日)
-                const today = new Date();
-                const dayOfWeek = today.getDay();
+            return function() {
+                seed = (seed * 9301 + 49297) % 233280;
+                return seed / 233280;
+            };
+        }
+
+        // 随机推荐函数
+        function getRecommendation() {
+            try {
+                const today = new Date().toDateString();
                 
-                // 只处理周一到周四 (1-4)
-                if (dayOfWeek < 1 || dayOfWeek > 4) {
-                    resultEl.innerHTML = `
-                        <div class="recommendation-text">🎉 周末啦！</div>
-                        <div class="food-name">自由选择</div>
-                        <div style="margin-top: 10px; font-size: 0.9rem; opacity: 0.8;">
-                            周末不参与随机推荐
-                        </div>
-                    `;
-                    statusEl.textContent = '周末不参与随机推荐，自由选择吧！';
-                    recommendBtn.innerHTML = originalText;
-                    recommendBtn.disabled = false;
+                // 检查是否已经有今日推荐
+                if (dailyRecommendations[currentMode] && dailyRecommendations[currentMode][today]) {
+                    const cachedRecommendation = dailyRecommendations[currentMode][today];
+                    showCachedRecommendation(cachedRecommendation);
                     return;
                 }
                 
-                const random = createDailySeededRandom();
+                const originalText = recommendBtn.innerHTML;
                 
-                // 获取本周已推荐的菜品
-                const weeklyUsed = weeklyHistory[currentMode];
+                // 显示加载状态
+                recommendBtn.innerHTML = '<div class="loading"></div> 推荐中...';
+                recommendBtn.disabled = true;
                 
-                // 找出未使用的菜品
-                const availableItems = currentMenu.filter(item => !weeklyUsed.includes(item));
+                statusEl.textContent = '正在计算今日推荐...';
                 
-                let recommendation;
-                
-                if (availableItems.length > 0) {
-                    // 还有未使用的菜品，随机选择一个
-                    const randomIndex = Math.floor(random() * availableItems.length);
-                    recommendation = availableItems[randomIndex];
+                // 模拟加载效果
+                setTimeout(() => {
+                    // 获取当前周几 (0-6, 0是周日)
+                    const today = new Date();
+                    const dayOfWeek = today.getDay();
                     
-                    // 添加到历史记录
-                    weeklyHistory[currentMode].push(recommendation);
-                    saveWeeklyHistory();
-                } else {
-                    // 所有菜品都已使用过，随机选择一个
-                    const randomIndex = Math.floor(random() * currentMenu.length);
-                    recommendation = currentMenu[randomIndex];
-                    statusEl.textContent = `本周所有选项都已推荐过，随机选择: ${recommendation}`;
-                }
+                    // 只处理周一到周四 (1-4)
+                    if (dayOfWeek < 1 || dayOfWeek > 4) {
+                        resultEl.innerHTML = `
+                            <div class="recommendation-text">🎉 周末啦！</div>
+                            <div class="food-name">自由选择</div>
+                            <div style="margin-top: 10px; font-size: 0.9rem; opacity: 0.8;">
+                                周末不参与随机推荐
+                            </div>
+                        `;
+                        statusEl.textContent = '周末不参与随机推荐，自由选择吧！';
+                        recommendBtn.innerHTML = originalText;
+                        recommendBtn.disabled = false;
+                        return;
+                    }
+                    
+                    const random = createDailySeededRandom();
+                    
+                    // 获取本周已推荐的菜品
+                    const weeklyUsed = weeklyHistory[currentMode];
+                    
+                    // 找出未使用的菜品
+                    const availableItems = currentMenu.filter(item => !weeklyUsed.includes(item));
+                    
+                    let recommendation;
+                    
+                    if (availableItems.length > 0) {
+                        // 还有未使用的菜品，随机选择一个
+                        const randomIndex = Math.floor(random() * availableItems.length);
+                        recommendation = availableItems[randomIndex];
+                        
+                        // 添加到历史记录
+                        weeklyHistory[currentMode].push(recommendation);
+                        saveWeeklyHistory();
+                    } else {
+                        // 所有菜品都已使用过，随机选择一个
+                        const randomIndex = Math.floor(random() * currentMenu.length);
+                        recommendation = currentMenu[randomIndex];
+                        statusEl.textContent = `本周所有选项都已推荐过，随机选择: ${recommendation}`;
+                    }
+                    
+                    // 保存每日推荐
+                    saveDailyRecommendation(recommendation);
+                    
+                    // 显示结果
+                    resultEl.innerHTML = `
+                        <div class="recommendation-text">🎉 今天推荐</div>
+                        <div class="food-name">${recommendation}</div>
+                        <div style="margin-top: 10px; font-size: 0.9rem; opacity: 0.8;">
+                            ${today.toLocaleDateString('zh-CN')} 周${['日','一','二','三','四','五','六'][dayOfWeek]}
+                        </div>
+                        <div style="margin-top: 5px; font-size: 0.8rem; opacity: 0.7;">
+                            (今日推荐已固定)
+                        </div>
+                    `;
+                    
+                    // 更新状态
+                    if (availableItems.length > 0) {
+                        statusEl.textContent = `推荐成功！本周已推荐 ${weeklyHistory[currentMode].length} 个不重样菜品`;
+                    }
+                    statusEl.style.color = '#4ECDC4';
+                    
+                    // 恢复按钮状态
+                    recommendBtn.innerHTML = originalText;
+                    recommendBtn.disabled = false;
+                    
+                }, 800);
                 
-                // 保存每日推荐
-                saveDailyRecommendation(recommendation);
-                
-                // 显示结果
-                resultEl.innerHTML = `
-                    <div class="recommendation-text">🎉 今天推荐</div>
-                    <div class="food-name">${recommendation}</div>
-                    <div style="margin-top: 10px; font-size: 0.9rem; opacity: 0.8;">
-                        ${today.toLocaleDateString('zh-CN')} 周${['日','一','二','三','四','五','六'][dayOfWeek]}
-                    </div>
-                    <div style="margin-top: 5px; font-size: 0.8rem; opacity: 0.7;">
-                        (今日推荐已固定)
-                    </div>
-                `;
-                
-                // 更新状态
-                if (availableItems.length > 0) {
-                    statusEl.textContent = `推荐成功！本周已推荐 ${weeklyHistory[currentMode].length} 个不重样菜品`;
-                }
-                statusEl.style.color = '#4ECDC4';
+            } catch (error) {
+                console.error('推荐失败:', error);
+                resultEl.innerHTML = '❌ 推荐失败，请重试';
+                statusEl.textContent = `错误: ${error.message}`;
+                statusEl.style.color = '#FF6B6B';
                 
                 // 恢复按钮状态
-                recommendBtn.innerHTML = originalText;
+                recommendBtn.innerHTML = '🎲 随机推荐';
                 recommendBtn.disabled = false;
-                
-            }, 800);
-            
-        } catch (error) {
-            console.error('推荐失败:', error);
-            resultEl.innerHTML = '❌ 推荐失败，请重试';
-            statusEl.textContent = `错误: ${error.message}`;
-            statusEl.style.color = '#FF6B6B';
-            
-            // 恢复按钮状态
-            recommendBtn.innerHTML = '🎲 随机推荐';
-            recommendBtn.disabled = false;
-        }
-    }
-
-    // 切换菜单显示
-    function toggleMenu() {
-        if (menuEl.style.display === 'block') {
-            menuEl.style.display = 'none';
-            statusEl.textContent = '已隐藏菜单';
-        } else {
-            menuEl.style.display = 'block';
-            statusEl.textContent = `显示${currentMode === 'dineIn' ? '堂食' : '外卖'}菜单，共 ${currentMenu.length} 个选项`;
-            // 确保菜单已初始化
-            if (menuListEl.children.length === 0 || 
-                menuListEl.children.length !== currentMenu.length) {
-                initMenu();
             }
         }
-    }
 
-    // 添加事件监听
-    document.addEventListener('DOMContentLoaded', function() {
-        statusEl.textContent = '请选择堂食或外卖模式';
-        
-        // 添加按钮事件
-        dineInBtn.addEventListener('click', () => selectMode('dineIn'));
-        deliveryBtn.addEventListener('click', () => selectMode('delivery'));
-        recommendBtn.addEventListener('click', getRecommendation);
-        menuBtn.addEventListener('click', toggleMenu);
-        
-        console.log('页面初始化完成');
-    });
-
-    // 添加键盘快捷键
-    document.addEventListener('keydown', function(event) {
-        if (event.code === 'Space' && !recommendBtn.disabled) {
-            event.preventDefault();
-            getRecommendation();
-        } else if (event.code === 'KeyM' && !menuBtn.disabled) {
-            event.preventDefault();
-            toggleMenu();
-        } else if (event.code === 'KeyD') {
-            event.preventDefault();
-            selectMode('dineIn');
-        } else if (event.code === 'KeyW') {
-            event.preventDefault();
-            selectMode('delivery');
+        // 切换菜单显示
+        function toggleMenu() {
+            if (menuEl.style.display === 'block') {
+                menuEl.style.display = 'none';
+                statusEl.textContent = '已隐藏菜单';
+            } else {
+                menuEl.style.display = 'block';
+                statusEl.textContent = `显示${currentMode === 'dineIn' ? '堂食' : '外卖'}菜单，共 ${currentMenu.length} 个选项`;
+                // 确保菜单已初始化
+                if (menuListEl.children.length === 0 || 
+                    menuListEl.children.length !== currentMenu.length) {
+                    initMenu();
+                }
+            }
         }
-    });
-</script>
+
+        // 添加事件监听
+        document.addEventListener('DOMContentLoaded', function() {
+            statusEl.textContent = '请选择堂食或外卖模式';
+            
+            // 添加按钮事件
+            dineInBtn.addEventListener('click', () => selectMode('dineIn'));
+            deliveryBtn.addEventListener('click', () => selectMode('delivery'));
+            recommendBtn.addEventListener('click', getRecommendation);
+            menuBtn.addEventListener('click', toggleMenu);
+            
+            console.log('页面初始化完成');
+        });
+
+        // 添加键盘快捷键
+        document.addEventListener('keydown', function(event) {
+            if (event.code === 'Space' && !recommendBtn.disabled) {
+                event.preventDefault();
+                getRecommendation();
+            } else if (event.code === 'KeyM' && !menuBtn.disabled) {
+                event.preventDefault();
+                toggleMenu();
+            } else if (event.code === 'KeyD') {
+                event.preventDefault();
+                selectMode('dineIn');
+            } else if (event.code === 'KeyW') {
+                event.preventDefault();
+                selectMode('delivery');
+            }
+        });
+    </script>
+</body>
+</html>
